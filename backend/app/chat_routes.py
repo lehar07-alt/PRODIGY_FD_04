@@ -101,4 +101,82 @@ def room_messages(room_id):
         return jsonify({"error": "You must join this room to view its messages"}), 403
 
     messages = Message.query.filter_by(room_id=room_id).order_by(Message.timestamp.asc()).all()
+    return jsonify({"messages": [m.to_dict() for m in messages]}), 
+
+from app.models import PrivateConversation
+
+
+# --- Start (or get existing) a private conversation with another user ---
+@chat_bp.route('/conversations/start', methods=['POST'])
+@jwt_required()
+def start_conversation():
+    user_id = int(get_jwt_identity())
+    data = request.get_json()
+
+    if not data or not data.get('other_user_id'):
+        return jsonify({"error": "other_user_id is required"}), 400
+
+    other_user_id = data.get('other_user_id')
+
+    if other_user_id == user_id:
+        return jsonify({"error": "Cannot start a conversation with yourself"}), 400
+
+    other_user = User.query.get(other_user_id)
+    if not other_user:
+        return jsonify({"error": "User not found"}), 404
+
+    # Normalize order so (A,B) and (B,A) are always stored the same way
+    user_one_id, user_two_id = sorted([user_id, other_user_id])
+
+    existing = PrivateConversation.query.filter_by(
+        user_one_id=user_one_id, user_two_id=user_two_id
+    ).first()
+
+    if existing:
+        return jsonify({
+            "message": "Conversation already exists",
+            "conversation": existing.to_dict(current_user_id=user_id)
+        }), 200
+
+    conversation = PrivateConversation(user_one_id=user_one_id, user_two_id=user_two_id)
+    db.session.add(conversation)
+    db.session.commit()
+
+    return jsonify({
+        "message": "Conversation started",
+        "conversation": conversation.to_dict(current_user_id=user_id)
+    }), 201
+
+
+# --- List all of the current user's private conversations ---
+@chat_bp.route('/conversations', methods=['GET'])
+@jwt_required()
+def list_conversations():
+    user_id = int(get_jwt_identity())
+
+    conversations = PrivateConversation.query.filter(
+        (PrivateConversation.user_one_id == user_id) |
+        (PrivateConversation.user_two_id == user_id)
+    ).all()
+
+    return jsonify({
+        "conversations": [c.to_dict(current_user_id=user_id) for c in conversations]
+    }), 200
+
+
+# --- Get message history for a specific private conversation ---
+@chat_bp.route('/conversations/<int:conversation_id>/messages', methods=['GET'])
+@jwt_required()
+def conversation_messages(conversation_id):
+    user_id = int(get_jwt_identity())
+
+    conversation = PrivateConversation.query.get(conversation_id)
+    if not conversation:
+        return jsonify({"error": "Conversation not found"}), 404
+
+    # Only the two participants can view this conversation
+    if user_id not in (conversation.user_one_id, conversation.user_two_id):
+        return jsonify({"error": "You are not part of this conversation"}), 403
+
+    messages = Message.query.filter_by(conversation_id=conversation_id).order_by(Message.timestamp.asc()).all()
     return jsonify({"messages": [m.to_dict() for m in messages]}), 200
