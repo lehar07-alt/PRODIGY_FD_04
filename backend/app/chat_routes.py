@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
-from app.models import Room, RoomMembership, User, Message
+from app.models import Room, RoomMembership, User, Message, PrivateConversation
 
 chat_bp = Blueprint('chat', __name__)
 
@@ -101,9 +101,9 @@ def room_messages(room_id):
         return jsonify({"error": "You must join this room to view its messages"}), 403
 
     messages = Message.query.filter_by(room_id=room_id).order_by(Message.timestamp.asc()).all()
-    return jsonify({"messages": [m.to_dict() for m in messages]}), 
+    return jsonify({"messages": [m.to_dict() for m in messages]}), 200
 
-from app.models import PrivateConversation
+
 
 
 # --- Start (or get existing) a private conversation with another user ---
