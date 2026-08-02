@@ -180,3 +180,9 @@ def conversation_messages(conversation_id):
 
     messages = Message.query.filter_by(conversation_id=conversation_id).order_by(Message.timestamp.asc()).all()
     return jsonify({"messages": [m.to_dict() for m in messages]}), 200
+
+@chat_bp.route('/users/online', methods=['GET'])
+@jwt_required()
+def online_users():
+    users = User.query.filter_by(is_online=True).all()
+    return jsonify({"online_users": [u.to_dict() for u in users]}), 200

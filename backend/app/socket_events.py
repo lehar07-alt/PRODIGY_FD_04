@@ -1,7 +1,8 @@
 from flask_socketio import join_room, leave_room, emit
 from flask_jwt_extended import decode_token
 from app import socketio, db
-from app.models import User, Message, RoomMembership
+from app.models import User, Message, RoomMembership, PrivateConversation
+from datetime import datetime
 
 # Keep track of which socket connection belongs to which user
 # Format: { socket_id: user_id }
@@ -17,6 +18,34 @@ def get_user_from_token(token):
     except Exception:
         return None
 
+@socketio.on('authenticate')
+def handle_authenticate(data):
+    """
+    Client sends this once, right after connecting: { token }
+    Marks the user online and tells everyone else.
+    """
+    from flask import request
+
+    token = data.get('token')
+    user = get_user_from_token(token)
+
+    if not user:
+        emit('error', {'message': 'Invalid or missing authentication token'})
+        return
+
+    connected_users[request.sid] = user.id
+
+    user.is_online = True
+    db.session.commit()
+
+    emit('presence_update', {
+        'user_id': user.id,
+        'username': user.username,
+        'is_online': True
+    }, broadcast=True)
+
+    print(f'{user.username} is now online')
+
 
 @socketio.on('connect')
 def handle_connect():
@@ -30,8 +59,20 @@ def handle_disconnect():
 
     user_id = connected_users.pop(sid, None)
     if user_id:
-        print(f'User {user_id} disconnected')
+        user = User.query.get(user_id)
+        if user:
+            user.is_online = False
+            user.last_seen = datetime.utcnow()
+            db.session.commit()
 
+            emit('presence_update', {
+                'user_id': user.id,
+                'username': user.username,
+                'is_online': False,
+                'last_seen': user.last_seen.isoformat()
+            }, broadcast=True)
+
+            print(f'{user.username} went offline')
 
 @socketio.on('join_room_channel')
 def handle_join_room(data):
