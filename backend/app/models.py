@@ -32,8 +32,8 @@ class User(db.Model):
             "email": self.email,
             "role": self.role,
             "is_online": self.is_online,
-            "last_seen": self.last_seen.isoformat() if self.last_seen else None,
-            "created_at": self.created_at.isoformat()
+            "last_seen": self.last_seen.isoformat()+ "Z" if self.last_seen else None,
+            "created_at": self.created_at.isoformat() + "Z"
         }
 
     def __repr__(self):
@@ -113,7 +113,7 @@ class Message(db.Model):
             "room_id": self.room_id,
             "conversation_id": self.conversation_id,
             "content": self.content,
-            "timestamp": self.timestamp.isoformat()
+            "timestamp": self.timestamp.isoformat() + "Z"
         }
 
     def __repr__(self):
