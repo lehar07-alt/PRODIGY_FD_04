@@ -49,6 +49,7 @@ function Dashboard() {
 
     // Listen for live presence updates
     const socket = getSocket();
+
     const handlePresence = (data) => {
       setOnlineUserIds((prev) => {
         const updated = new Set(prev);
@@ -59,6 +60,10 @@ function Dashboard() {
         }
         return updated;
       });
+    };
+
+    const handleConversationNotification = () => {
+    listConversations(token).then((data) => setConversations(data.conversations));
     };
 
     socket.on('presence_update', handlePresence);

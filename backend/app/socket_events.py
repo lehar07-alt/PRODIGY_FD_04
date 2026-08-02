@@ -35,6 +35,8 @@ def handle_authenticate(data):
 
     connected_users[request.sid] = user.id
 
+    join_room(f"user_{user.id}")
+
     user.is_online = True
     db.session.commit()
 
@@ -224,3 +226,9 @@ def handle_send_private_message(data):
     # --- Broadcast to both participants ---
     conv_channel = f"conversation_{conversation_id}"
     emit('new_private_message', message.to_dict(), room=conv_channel)
+
+    other_user_id = conversation.user_two_id if user.id == conversation.user_one_id else conversation.user_one_id
+    emit('conversation_notification', {
+        'conversation_id': conversation_id,
+        'message': message.to_dict()
+    }, room=f"user_{other_user_id}")
